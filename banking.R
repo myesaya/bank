@@ -257,10 +257,505 @@ df |>
   save_as_docx(path = "~/gitrepos/bank/age-media usage.docx")
 
 
-# Objective Evaluate the Influence of Social Media Campaigns on Brand Perception --------
+# Objective 2:  Evaluate the Influence of Social Media Campaigns on Brand Perception --------
 #Goal: Goal: Measure how campaigns affect trust, loyalty, and brand image.
+# Load required libraries
+library(tidyverse)
+library(ggthemes)
+library(likert)
+library(sjPlot)
+
+
+
+#digital banking platforms used
+
+df <- df %>%
+  dplyr::filter(yes_name_digital_platform!='NA') |> 
+  mutate(yes_name_digital_platform = str_remove_all(yes_name_digital_platform, ";+$"),
+         row = row_number()) %>%
+  separate_rows(yes_name_digital_platform, sep = ";") %>%
+  mutate(value = 1) %>%
+  pivot_wider(names_from = yes_name_digital_platform, values_from = value, values_fill = 0) %>%
+  dplyr::select(-row)
+
+glimpse(df)
+#plot version 2
+plot <- df |>
+  dplyr::select(id,"Mobile banking app":"Other (please specify) __________") |>
+  drop_na() |>
+  mutate(across("Mobile banking app":"Other (please specify) __________", ~ ifelse(. == 1, "Yes", "No")))
+
+
+usefulness <- plot |>
+  pivot_longer(
+    cols = "Mobile banking app":"Other (please specify) __________",
+    names_to = "how",
+    values_to = "Response"
+  ) |> 
+  
+  mutate(how = as.factor(how)) |>
+  mutate(how = fct_recode(how,
+                          ATM = "ATM services",
+                          "Banking app"="Mobile banking app",
+                          "USSD banking"="USSD banking (*626#)",
+                          "Internet banking"= "Internet banking",
+                          Other= "Other (please specify) __________"))
+
+  usefulness$how<-as.factor(usefulness$how)
+  levels(usefulness$how)
+
+#######plotting
+mhm<-usefulness |>
+  filter(Response == "Yes") |>
+  drop_na() |>
+  group_by(how) |>
+  summarise(
+    Count = n(),
+    Percentage = (Count / n_distinct(usefulness$id)) * 100
+  )  |>
+  ggplot(aes(x = fct_reorder(how, Percentage, .desc = TRUE), y = Percentage, fill = how)) +
+  geom_col(width = 0.45) +
+  geom_text(aes(label = sprintf("%.2f%%", Percentage)),
+            vjust = -0.5, size = 5, fontface = "bold") +
+  scale_y_continuous(limits = c(0, 70), breaks = seq(0, 100, 20)) +  # Ensure Y-axis goes up to 100%
+  labs(title=" Customer-Bank Interaction (Banking Platforms)",
+       x = "Name",
+       y = "Percentage (%)") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold", color = "black"),  # Black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black"),  # Black X-axis title
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),  # Black Y-axis title
+    axis.text.x = element_text(size = 13, color = "black", angle = 45, hjust = 1),  # Black X-axis text
+    axis.text.y = element_text(size = 13, color = "black")   # Black Y-axis text
+  ) +
+  guides(fill = "none")
+mhm
+
+ggsave("Customer-Bank Interaction (Banking Platforms).pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
+
+
+#purely mobile banking
+#######plotting 2
+mhm<-usefulness |>
+  filter(how!="ATM") |> 
+  filter(Response == "Yes") |>
+  drop_na() |>
+  group_by(how) |>
+  summarise(
+    Count = n(),
+    Percentage = (Count / n_distinct(usefulness$id)) * 100
+  )  |>
+  ggplot(aes(x = fct_reorder(how, Percentage, .desc = TRUE), y = Percentage, fill = how)) +
+  geom_col(width = 0.35) +
+  geom_text(aes(label = sprintf("%.2f%%", Percentage)),
+            vjust = -0.5, size = 5, fontface = "bold") +
+  scale_y_continuous(limits = c(0, 70), breaks = seq(0, 100, 20)) +  # Ensure Y-axis goes up to 100%
+  labs(title="Mobile Banking platforms used",
+       x = "Name",
+       y = "Percentage (%)") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold", color = "black"),  # Black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black"),  # Black X-axis title
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),  # Black Y-axis title
+    axis.text.x = element_text(size = 13, color = "black", angle = 45, hjust = 1),  # Black X-axis text
+    axis.text.y = element_text(size = 13, color = "black")   # Black Y-axis text
+  ) +
+  guides(fill = "none")
+mhm
+
+ggsave("Mobile Banking platforms used.pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
+
+#often engagement
+
+# Data Preparation
+df<-df |> 
+  dplyr::rename(
+    engagement = often,
+    image=testimonials,
+    trust = easy_understand,
+    loyalty = recommended,
+    influence = socia_has_influenced_digital_use,
+    effectiveness = rate_effectiveness
+  ) 
+# --------------------------
+# DESCRIPTIVE ANALYSIS (Visuals)
+# --------------------------
+
+# 1. Trust Distribution
+
+data_with_percentages <- df %>%
+  drop_na(trust) %>%  # Remove rows where 'trust' is NA
+  count(trust) %>%    # Count occurrences of each 'trust' level
+  mutate(percentage = n / sum(n) * 100)  # Calculate percentage
+
+
+data_with_percentages$trust<-as.factor(data_with_percentages)
+levels(data_with_percentages$trust)
+
+# Step 2: Create the ggplot
+mhm<-ggplot(data_with_percentages, aes(x = fct_reorder(trust, -percentage), 
+                                  y = percentage, fill = trust)) +
+  geom_col(width = 0.5) +
+  geom_text(aes(label = sprintf("%.1f%%", percentage)),
+            vjust = -0.5, size = 5, fontface = "bold") +
+  scale_y_continuous(limits = c(0, 40), breaks = seq(0, 100, 10)) +  # Ensure Y-axis goes up to 100%
+  labs(title = "Customers trust in NBM's digital banking",
+       subtitle = "Based on Social Media Marketing",
+       x="Trust level",
+       y = "Percentage (%)") +
+  theme_economist() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", color = "black"),  # Black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black",face = "bold"),  # Black X-axis title
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),  # Black Y-axis title
+    axis.text.x = element_text(size = 13, color = "black"),  # Black X-axis text
+    axis.text.y = element_text(size = 13, color = "black")   # Black Y-axis text
+  ) +
+  guides(fill = "none")  # Remove legend since colors are for distinction
+mhm
+
+ggsave("Customers trust in NBM's digital banking.pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
+
+
+#image
+# 1. image Distribution
+
+data_with_percentages <- df %>%
+  drop_na(image) %>%  # Remove rows where 'trust' is NA
+  count(image) %>%    # Count occurrences of each 'trust' level
+  mutate(percentage = n / sum(n) * 100)  # Calculate percentage
+
+# Step 2: Create the ggplot
+mhm<-ggplot(data_with_percentages, aes(x = fct_reorder(image, -percentage), 
+                                  y = percentage, fill = image)) +
+  geom_col(width = 0.5) +
+  geom_text(aes(label = sprintf("%.1f%%", percentage)),
+            vjust = -0.5, size = 5, fontface = "bold") +
+  scale_y_continuous(limits = c(0, 40), breaks = seq(0, 100, 10)) +  # Ensure Y-axis goes up to 100%
+  labs(title = "Brand image of NBM's digital banking",
+       subtitle = "Based on Social Media Testimonials",
+       x="Frequency",
+       y = "Percentage (%)") +
+  theme_economist() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", color = "black"),  # Black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black",face = "bold"),  # Black X-axis title
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),  # Black Y-axis title
+    axis.text.x = element_text(size = 13, color = "black"),  # Black X-axis text
+    axis.text.y = element_text(size = 13, color = "black")   # Black Y-axis text
+  ) +
+  guides(fill = "none")  # Remove legend since colors are for distinction
+
+mhm
+ggsave("Brand image of NBM's digital banking.pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
+
+
+
+# 2. Engagement vs. Effectiveness
+plot<- df |>
+  
+  # Calculate counts and percentages within each pigparasite group
+  group_by(engagement, effectiveness) |>
+  drop_na() |>
+  summarise(count = n()) |>
+  mutate(percentage = count / sum(count) * 100) |>
+  ggplot(aes(x = engagement,
+             y = count, fill = effectiveness)) +
+  geom_bar(stat = "identity", position = "fill",width=0.6) +  # Position fill scales the bars to 100%
+  geom_text(aes(label = paste0(format(round(percentage, 1), nsmall = 1), "%")),
+            position = position_fill(vjust = 0.5), size = 5, fontface = "bold") +  # Add percentage labels on the bars
+  labs(title="Engagement Frequency vs. Marketing Effectiveness",
+       x= "Engagement level",
+       y = "Proportion",  # Percentage representation
+       fill = "Effectiveness") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", color = "black"),  # Bold, centered black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black", face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),
+    axis.text.x = element_text(size = 13, color = "black", angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 13, color = "black"),
+    legend.position = "right",
+    legend.justification = "center",
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14, face = "bold")  # Bold legend title
+  )
+
+plot
+
+ggsave("Engagement Frequency vs. Marketing Effectiveness.pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
+
+
+# 3. Influence on Adoption Decision
+data_with_percentages <- df %>%
+  drop_na(influence) %>%  # Remove rows where 'trust' is NA
+  count(influence) %>%    # Count occurrences of each 'trust' level
+  mutate(percentage = n / sum(n) * 100)  # Calculate percentage
+
+# Step 2: Create the ggplot
+mhm<-ggplot(data_with_percentages, aes(x = fct_reorder(influence, -percentage), 
+                                       y = percentage, fill = influence)) +
+  geom_col(width = 0.45) +
+  geom_text(aes(label = sprintf("%.1f%%", percentage)),
+            vjust = -0.5, size = 5.5, fontface = "bold") +
+  scale_y_continuous(limits = c(0, 50), breaks = seq(0, 100, 10)) +  # Ensure Y-axis goes up to 100%
+  labs(title = "Social Media Influence on Digital Banking Adoption",
+       x="Influence level",
+       y = "Percentage (%)") +
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", color = "black"),  # Black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black",face = "bold"),  # Black X-axis title
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),  # Black Y-axis title
+    axis.text.x = element_text(size = 13, color = "black"),  # Black X-axis text
+    axis.text.y = element_text(size = 13, color = "black")   # Black Y-axis text
+  ) +
+  guides(fill = "none")  # Remove legend since colors are for distinction
+mhm
+
+ggsave("Social Media Influence on Digital Banking Adoption.pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
+
+# --------------------------
+# INFERENTIAL ANALYSIS
+# --------------------------
+
+# 1. Ordinal Regression (Trust ~ Engagement + Effectiveness)
+# Load libraries
+library(dplyr)
+library(gt)
+library(MASS)
+library(tibble)  # for rownames_to_column()
+
+# Prepare data: ensure 'trust' is an ordered factor
+df <- df |>
+  mutate(trust = factor(trust,
+                        levels = c("Strongly Disagree", 
+                                   "Disagree", 
+                                   "Neutral", 
+                                   "Agree", 
+                                   "Strongly Agree"),
+                        ordered = TRUE))
+
+# Fit the ordered logistic regression model
+trust_model <- polr(trust ~ engagement + effectiveness + image, 
+                    data = df, Hess = TRUE)
+
+# Extract coefficient summary
+coefs <- as.data.frame(coef(summary(trust_model)))
+
+# Ensure 't value' is numeric
+coefs$t.value <- as.numeric(coefs[["t value"]])
+
+# Calculate p-values
+coefs$p_value <- 2 * pnorm(abs(coefs$t.value), lower.tail = FALSE)
+
+# Create gt summary table
+gt_table <- coefs |>
+  rownames_to_column("Predictor") |>
+  mutate(across(where(is.numeric), round, 3)) |>
+  gt() |>
+  tab_header(
+    title = "Ordered Logistic Regression Results",
+    subtitle = "Predicting Trust (Positive brand perception)"
+  ) |>
+  cols_label(
+    Predictor = "Variable",
+    Value = "Estimate",
+    t.value = "t value",
+    p_value = "p-value"
+  )
+
+# Print the gt table
+gt_table
+
+gtsave(gt_table, filename = "ordinal.docx")
+
+
+# Challenges --------------------------------------------------------------
+
+
+df <- df %>%
+  dplyr::filter(challlenge!='NA') |> 
+  mutate(challlenge = str_remove_all(challlenge, ";+$"),
+         row = row_number()) %>%
+  separate_rows(challlenge, sep = ";") %>%
+  mutate(value = 1) |> 
+  pivot_wider(names_from = challlenge, values_from = value, values_fill = 0) %>%
+  dplyr::select(-row)
+
+glimpse(df)
+#plot version 1
+plot <- df |>
+  dplyr::select(id,"Poor internet connectivity":"Other (please specify)") |>
+  drop_na() |>
+  mutate(across("Poor internet connectivity":"Other (please specify)", ~ ifelse(. == 1, "Yes", "No")))
+
+
+usefulness <- plot |>
+  pivot_longer(
+    cols = "Poor internet connectivity":"Other (please specify)",
+    names_to = "how",
+    values_to = "Response"
+  ) |> 
+  mutate(how = as.factor(how)) |>
+  mutate(how = fct_recode(how,
+                          "Difficult registration process " =  "Difficult registration process ",
+                          "Lack of clear instructions "="Lack of clear instructions " ,
+                          "Other"= "Other (please specify)",
+                          "Poor internet connectivity"= "Poor internet connectivity",
+                          "Security concerns"= "Security concerns "))
+
+
+levels(usefulness$how)
+
+#######plotting
+mhm<-usefulness |>
+  filter(Response == "Yes") |>
+  drop_na() |>
+  group_by(how) |>
+  summarise(
+    Count = n(),
+    Percentage = (Count / n_distinct(usefulness$id)) * 100
+  )  |> 
+  ggplot(aes(x = fct_reorder(how, Percentage, .desc = TRUE), y = Percentage, fill = how)) +
+  geom_col(width = 0.35) +
+  geom_text(aes(label = sprintf("%.2f%%", Percentage)),
+            vjust = -0.5, size = 5, fontface = "bold") +
+  scale_y_continuous(limits = c(0, 75), breaks = seq(0, 100, 20)) +  # Ensure Y-axis goes up to 100%
+  labs(title="Challenges in using NBM digital services",
+       x = "Challenge",
+       y = "Percentage (%)") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold", color = "black"),  # Black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black"),  # Black X-axis title
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),  # Black Y-axis title
+    axis.text.x = element_text(size = 13, color = "black", angle = 45, hjust = 1),  # Black X-axis text
+    axis.text.y = element_text(size = 13, color = "black")   # Black Y-axis text
+  ) +
+  guides(fill = "none")
+mhm
+
+ggsave("Challenges in using NBM digital services.pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
+
+
+#####################################################
+# Load required libraries
+library(tidyverse)
+library(ggthemes)
+library(scales)
+library(ggwordcloud)
+library(tm)
+library(forcats)
+#####easy
+# 1. easy Distribution
+
+data_with_percentages <- df %>%
+  drop_na(easy) %>%  # Remove rows where 'trust' is NA
+  count(easy) %>%    # Count occurrences of each 'trust' level
+  mutate(percentage = n / sum(n) * 100)  # Calculate percentage
+
+
+data_with_percentages$trust<-as.factor(data_with_percentages)
+levels(data_with_percentages$trust)
+
+# Step 2: Create the ggplot
+mhm<-ggplot(data_with_percentages, aes(x = fct_reorder(easy, -percentage), 
+                                       y = percentage, fill = easy)) +
+  geom_col(width = 0.45) +
+  geom_text(aes(label = sprintf("%.1f%%", percentage)),
+            vjust = -0.5, size = 5, fontface = "bold") +
+  scale_y_continuous(limits = c(0, 65), breaks = seq(0, 100, 10)) +  # Ensure Y-axis goes up to 100%
+  labs(title = "Easiness to navigate NBM banking services",
+       x="Easiness level",
+       y = "Percentage (%)") +
+  theme_clean() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", color = "black"),  # Black title
+    axis.title.x = element_text(hjust = 0.5, size = 14, color = "black",face = "bold"),  # Black X-axis title
+    axis.title.y = element_text(hjust = 0.5, size = 14, color = "black"),  # Black Y-axis title
+    axis.text.x = element_text(size = 13, color = "black"),  # Black X-axis text
+    axis.text.y = element_text(size = 13, color = "black")   # Black Y-axis text
+  ) +
+  guides(fill = "none")  # Remove legend since colors are for distinction
+mhm
+
+ggsave("Easiness to navigate NBM's mobile banking.pdf",
+       plot = mhm,
+       width = 9, height = 6,
+       units = "in", device = "pdf")
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+###suggestions and improvements-word cloud
+# Word cloud visualization
+# Load required libraries
+library(dplyr)
+library(tidytext)
+install.packages("tidytext")
+library(ggplot2)
+library(ggwordcloud)
+library(stringr)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Filter out NA and preprocess suggestions
+word_freq <- df |>
+  filter(!is.na(suggestions)) |>
+  pull(suggestions) |>
+  tolower() |>
+  str_replace_all("[^[:alnum:]\\s]", " ") |>
+  str_squish() |>
+  str_split("\\s+") |>
+  unlist() |>
+  as_tibble() |>
+  rename(word = value) |>
+  anti_join(stop_words, by = "word") |>
+  count(word, sort = TRUE)
+
+# Create the word cloud
+wordcloud_plot <- ggplot(word_freq, aes(label = word, size = n, color = n)) +
+  geom_text_wordcloud(shape = "square", rm_outside = TRUE) +
+  scale_size_area(max_size = 14) +
+  scale_color_gradient(low = "#1f77b4", high = "#d62728") +
+  theme_minimal() +
+  labs(title = "Key Themes in Customer Improvement Suggestions")
+
+# Show the word cloud
+wordcloud_plot
 
