@@ -722,19 +722,28 @@ ggsave("Easiness to navigate NBM's mobile banking.pdf",
 
 
 ###suggestions and improvements-word cloud
-# Word cloud visualization
-# Load required libraries
+# -------------------------------
+
+# Install required packages if missing
+packages <- c("dplyr", "tidytext", "ggplot2", "ggwordcloud", "stringr", "tibble")
+
+installed <- packages %in% rownames(installed.packages())
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# Load libraries
 library(dplyr)
 library(tidytext)
-install.packages("tidytext")
 library(ggplot2)
 library(ggwordcloud)
 library(stringr)
+library(tibble)
 
 # Set seed for reproducibility
 set.seed(123)
 
-# Filter out NA and preprocess suggestions
+# Filter NA and preprocess suggestions
 word_freq <- df |>
   filter(!is.na(suggestions)) |>
   pull(suggestions) |>
@@ -748,7 +757,7 @@ word_freq <- df |>
   anti_join(stop_words, by = "word") |>
   count(word, sort = TRUE)
 
-# Create the word cloud
+# Generate word cloud
 wordcloud_plot <- ggplot(word_freq, aes(label = word, size = n, color = n)) +
   geom_text_wordcloud(shape = "square", rm_outside = TRUE) +
   scale_size_area(max_size = 14) +
@@ -756,6 +765,9 @@ wordcloud_plot <- ggplot(word_freq, aes(label = word, size = n, color = n)) +
   theme_minimal() +
   labs(title = "Key Themes in Customer Improvement Suggestions")
 
-# Show the word cloud
+# Display plot
 wordcloud_plot
 
+
+#########
+# 2. Challenge-Convenience Relationship
